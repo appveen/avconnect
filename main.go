@@ -12,6 +12,12 @@ import (
 )
 
 func main() {
+	reloadPtr := flag.Bool("r", false, "Reload server config")
+	connectPtr := flag.Int("c", 0, "Quick connect")
+	flag.Parse()
+	fmt.Println("Reload:", *reloadPtr)
+	fmt.Println("Connect:", *connectPtr)
+
 	var credentialHandler = lib.CredentialHandler{}
 	var regionHandler = lib.RegionHandler{}
 	credentialHandler.InitCreds()
@@ -25,12 +31,6 @@ func main() {
 	if err != nil {
 		panic("Error creating session")
 	}
-
-	reloadPtr := flag.Bool("r", false, "Reload server config")
-	connectPtr := flag.Int("c", 0, "Quick connect")
-	flag.Parse()
-	fmt.Println("Reload:", *reloadPtr)
-	fmt.Println("Connect:", *connectPtr)
 
 	var ec2Instances = awslib.EC2{}
 	ec2Instances.Init(sess, *reloadPtr, *connectPtr)
