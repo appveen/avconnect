@@ -1,0 +1,6 @@
+config
+credentials
+goAws
+av.pem
+servers.json
+bin/
