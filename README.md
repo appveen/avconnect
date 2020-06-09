@@ -3,7 +3,7 @@ Go based server connection tool
 
 # Usage
 
-* Download the executable from latest **Releases**
+* Download the executable from latest **[Releases](https://github.com/appveen/avconnect/releases)**
 * Run it as `./avconnect`
 
 # CLI options
