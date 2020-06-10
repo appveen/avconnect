@@ -4,7 +4,8 @@ Go based server connection tool
 # Usage
 
 * Download the executable from latest **[Releases](https://github.com/appveen/avconnect/releases)**
-* Run it as `./avconnect`
+* Give the executable execute permission, `chmod a+x avconnect-<platform>`
+* Run it as `./avconnect-<platform>`
 
 # CLI options
 
