@@ -1,4 +1,4 @@
-package lib
+package main
 
 // Check - display error
 func Check(e error) {

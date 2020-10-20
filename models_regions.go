@@ -1,4 +1,4 @@
-package models
+package main
 
 type regions struct {
 	Name   string `json:"name"`

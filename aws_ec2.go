@@ -1,4 +1,4 @@
-package awslib
+package main
 
 import (
 	"bufio"
@@ -12,9 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	"../lib"
-
-	"github.com/AlecAivazis/survey"
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/fatih/color"
@@ -63,7 +61,7 @@ func (e *EC2) Init(sess *session.Session, reload bool, quickConnect int) {
 		}{}
 
 		err := survey.Ask(qs, &answer)
-		lib.Check(err)
+		Check(err)
 		fmt.Println(answer.Selection)
 		server = servers[answer.Selection-1]
 	} else if quickConnect > len(servers) {
@@ -78,7 +76,7 @@ func (e *EC2) Init(sess *session.Session, reload bool, quickConnect int) {
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
-	lib.Check(err)
+	Check(err)
 }
 
 func sortServers(servers []Server) []Server {
@@ -174,7 +172,7 @@ func fetchEC2Instances(sess *session.Session) {
 	svc := ec2.New(sess)
 	input := &ec2.DescribeInstancesInput{}
 	results, err := svc.DescribeInstances(input)
-	lib.Check(err)
+	Check(err)
 
 	counter := 1
 
