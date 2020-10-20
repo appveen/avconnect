@@ -4,8 +4,6 @@ import (
 	"flag"
 	"fmt"
 
-	"./awslib"
-	"./lib"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -18,8 +16,8 @@ func main() {
 	fmt.Println("Reload:", *reloadPtr)
 	fmt.Println("Connect:", *connectPtr)
 
-	var credentialHandler = lib.CredentialHandler{}
-	var regionHandler = lib.RegionHandler{}
+	var credentialHandler = CredentialHandler{}
+	var regionHandler = RegionHandler{}
 	credentialHandler.InitCreds()
 	region := regionHandler.InitRegion()
 
@@ -32,6 +30,6 @@ func main() {
 		panic("Error creating session")
 	}
 
-	var ec2Instances = awslib.EC2{}
+	var ec2Instances = EC2{}
 	ec2Instances.Init(sess, *reloadPtr, *connectPtr)
 }

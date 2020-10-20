@@ -1,4 +1,4 @@
-package lib
+package main
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/AlecAivazis/survey"
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/color"
 )
 

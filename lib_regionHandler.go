@@ -1,4 +1,4 @@
-package lib
+package main
 
 import (
 	"bufio"
@@ -7,9 +7,7 @@ import (
 	"path"
 	"path/filepath"
 
-	"../data"
-
-	"github.com/AlecAivazis/survey"
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/color"
 )
 
@@ -21,7 +19,7 @@ func (rh *RegionHandler) setRegion() {
 
 	var prompt = &survey.Select{
 		Message: "Select your region ",
-		Options: data.GetHoomanReadableRegionList(),
+		Options: GetHoomanReadableRegionList(),
 	}
 
 	region := ""
@@ -31,7 +29,7 @@ func (rh *RegionHandler) setRegion() {
 		panic("No region selected!")
 	}
 
-	region = data.GetRegionCode(region)
+	region = GetRegionCode(region)
 
 	homeDir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
 	configFile := path.Join(homeDir, "config")
@@ -51,8 +49,8 @@ func (rh *RegionHandler) getRegion() string {
 	scanner := bufio.NewScanner(file)
 	scanner.Scan()
 	region := scanner.Text()
-	data.CheckRegionCode(region)
-	fmt.Printf("Region: %s\n", color.GreenString(data.GetHoomanReadableRegionName(region)))
+	CheckRegionCode(region)
+	fmt.Printf("Region: %s\n", color.GreenString(GetHoomanReadableRegionName(region)))
 	return region
 }
 
