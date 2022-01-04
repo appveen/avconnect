@@ -42,7 +42,7 @@ func (ch *CredentialHandler) getCredentials() {
 	homeDir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
 	credentialsFile := path.Join(homeDir, "credentials")
 
-	file, err := os.Create(credentialsFile)
+	file, _ := os.Create(credentialsFile)
 	defer file.Close()
 	file.WriteString("[default]\n")
 	file.WriteString("aws_access_key_id = " + answers.AccessKey + "\n")
