@@ -70,13 +70,17 @@ func (e *EC2) Init(sess *session.Session, reload bool, quickConnect int) {
 		server = servers[quickConnect-1]
 	}
 
-	cmd := exec.Command("ssh", "-i", "./av.pem", server.User+"@"+server.PublicIPAddress)
-	fmt.Println(cmd)
-	cmd.Stdout = os.Stdout
-	cmd.Stdin = os.Stdin
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
-	Check(err)
+	if server.State == "stopped" || server.State == "terminated" || server.PublicIPAddress == "-" {
+		fmt.Printf("Cannot connect to %s(%s) (IP:%s) \n", color.YellowString(server.Name), server.State, server.PublicIPAddress)
+	} else {
+		cmd := exec.Command("ssh", "-i", "./av.pem", server.User+"@"+server.PublicIPAddress)
+		fmt.Println(cmd)
+		cmd.Stdout = os.Stdout
+		cmd.Stdin = os.Stdin
+		cmd.Stderr = os.Stderr
+		err := cmd.Run()
+		Check(err)
+	}
 }
 
 func sortServers(servers []Server) []Server {
@@ -110,7 +114,7 @@ func setColor(status string, s string) string {
 		return color.RedString(s)
 	}
 	if status == "terminated" {
-		return color.WhiteString(s)
+		return color.YellowString(s)
 	}
 	return s
 }
@@ -185,7 +189,10 @@ func fetchEC2Instances(sess *session.Session) {
 			server.State = *instance.State.Name
 			server.InstanceType = *instance.InstanceType
 			server.LaunchTime = *instance.LaunchTime
-			server.PrivateIPAddress = *instance.PrivateIpAddress
+			server.PrivateIPAddress = "-"
+			if instance.PrivateIpAddress != nil {
+				server.PrivateIPAddress = *instance.PrivateIpAddress
+			}
 			server.PublicIPAddress = "-"
 			server.InstanceID = *instance.InstanceId
 			if instance.PublicIpAddress != nil {
@@ -209,7 +216,7 @@ func fetchEC2Instances(sess *session.Session) {
 	homeDir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
 	serversJSON := path.Join(homeDir, "servers.json")
 
-	file, err := os.Create(serversJSON)
+	file, _ := os.Create(serversJSON)
 	defer file.Close()
 	file.WriteString(string(s))
 	file.Sync()

@@ -9,7 +9,7 @@ env GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/avconnect-linux-amd
 echo "env GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/avconnect-mac ."
 env GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/avconnect-mac .
 
-cd bin
+cd bin || exit
 
 md5sum avconnect-linux-386 > md5sum.txt
 md5sum avconnect-linux-amd64 >> md5sum.txt
