@@ -4,3 +4,6 @@ goAws
 av.pem
 servers.json
 bin/
+run.sh
+credentials.json
+builds
