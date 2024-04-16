@@ -21,7 +21,7 @@ require("colors");
 const inquirer_1 = require("inquirer");
 const types_1 = require("./types");
 const version = "2.0.0";
-let REGION = "ap-south-1";
+let REGIONS = ["ap-south-1", "ap-south-2"];
 let KEY = "./av.pem";
 const servers = [];
 const serverNames = [];
@@ -55,6 +55,12 @@ function checkAndMigrate() {
     (0, fs_1.rmSync)("config");
     console.log("Migration successful");
 }
+function configureRegions() {
+    if ((0, fs_1.existsSync)("region.json"))
+        return;
+    (0, fs_1.writeFileSync)("region.json", JSON.stringify(REGIONS));
+    console.log("Region Configured");
+}
 function setConfig() {
     return __awaiter(this, void 0, void 0, function* () {
         const questions = [
@@ -85,10 +91,11 @@ function setConfig() {
 }
 function setEnvVars() {
     const creds = JSON.parse((0, fs_1.readFileSync)("credentials.json").toString());
+    const regions = JSON.parse((0, fs_1.readFileSync)("region.json").toString());
     process.env.AWS_ACCESS_KEY_ID = creds.AWS_ACCESS_KEY_ID;
     process.env.AWS_SECRET_ACCESS_KEY = creds.AWS_SECRET_ACCESS_KEY;
-    REGION = creds.REGION;
     KEY = creds.KEY;
+    REGIONS = regions;
 }
 function parseTags(tags) {
     const tagData = {
@@ -107,7 +114,6 @@ function parseTags(tags) {
     return tagData;
 }
 function getEC2Instances() {
-    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const serverList = {
             pending: [],
@@ -117,25 +123,29 @@ function getEC2Instances() {
             terminated: [],
             "shutting-down": []
         };
-        const ec2Client = new aws_sdk_1.EC2({ region: REGION });
-        const listOfInstances = yield ec2Client.describeInstances().promise();
-        (_a = listOfInstances.Reservations) === null || _a === void 0 ? void 0 : _a.forEach((reservations) => {
-            const instance = reservations.Instances[0];
-            const tags = parseTags(instance.Tags);
-            const server = new types_1.Server(tags);
-            server.instanceType = instance.InstanceType;
-            server.privateIP = instance.PrivateIpAddress;
-            server.publicIP = instance.PublicIpAddress || "---";
-            server.state = instance.State.Name || null;
-            server.instanceID = instance.InstanceId;
-            serverList[server.state].push(server);
-        });
-        serverList.pending = serverList.pending.sort(stringComparison);
-        serverList.running = serverList.running.sort(stringComparison);
-        serverList.stopped = serverList.stopped.sort(stringComparison);
-        serverList.stopping = serverList.stopping.sort(stringComparison);
-        serverList.terminated = serverList.terminated.sort(stringComparison);
-        serverList["shutting-down"] = serverList["shutting-down"].sort(stringComparison);
+        yield REGIONS.reduce((prev, region) => __awaiter(this, void 0, void 0, function* () {
+            var _a;
+            yield prev;
+            const ec2Client = new aws_sdk_1.EC2({ region: region });
+            const listOfInstances = yield ec2Client.describeInstances().promise();
+            (_a = listOfInstances.Reservations) === null || _a === void 0 ? void 0 : _a.forEach((reservations) => {
+                const instance = reservations.Instances[0];
+                const tags = parseTags(instance.Tags);
+                const server = new types_1.Server(tags);
+                server.instanceType = instance.InstanceType;
+                server.privateIP = instance.PrivateIpAddress;
+                server.publicIP = instance.PublicIpAddress || "---";
+                server.state = instance.State.Name || null;
+                server.instanceID = instance.InstanceId;
+                serverList[server.state].push(server);
+            });
+            serverList.pending = serverList.pending.sort(stringComparison);
+            serverList.running = serverList.running.sort(stringComparison);
+            serverList.stopped = serverList.stopped.sort(stringComparison);
+            serverList.stopping = serverList.stopping.sort(stringComparison);
+            serverList.terminated = serverList.terminated.sort(stringComparison);
+            serverList["shutting-down"] = serverList["shutting-down"].sort(stringComparison);
+        }), Promise.resolve());
         (0, fs_1.writeFileSync)("servers.json", JSON.stringify(serverList));
     });
 }
@@ -184,6 +194,7 @@ function init(refreshList, display) {
         const migrationRetrunCode = checkAndMigrate();
         if (migrationRetrunCode == "ERR_MISSING_CONFIG")
             yield setConfig();
+        configureRegions();
         setEnvVars();
         if (!(0, fs_1.existsSync)("servers.json") || refreshList)
             yield getEC2Instances();

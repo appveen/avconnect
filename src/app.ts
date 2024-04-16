@@ -9,7 +9,7 @@ import { Server, ServerList } from "./types";
 
 const version = "2.0.0";
 
-let REGION = "ap-south-1";
+let REGIONS = ["ap-south-1", "ap-south-2"];
 let KEY = "./av.pem";
 const servers: string[][] = [];
 const serverNames: string[] = [];
@@ -44,6 +44,12 @@ function checkAndMigrate() {
 	console.log("Migration successful");
 }
 
+function configureRegions() {
+	if (existsSync("region.json")) return;
+	writeFileSync("region.json", JSON.stringify(REGIONS));
+	console.log("Region Configured");
+}
+
 async function setConfig() {
 	const questions = [
 		{
@@ -73,10 +79,11 @@ async function setConfig() {
 
 function setEnvVars() {
 	const creds = JSON.parse(readFileSync("credentials.json").toString());
+	const regions = JSON.parse(readFileSync("region.json").toString());
 	process.env.AWS_ACCESS_KEY_ID = creds.AWS_ACCESS_KEY_ID;
 	process.env.AWS_SECRET_ACCESS_KEY = creds.AWS_SECRET_ACCESS_KEY;
-	REGION = creds.REGION;
 	KEY = creds.KEY;
+	REGIONS = regions;
 }
 
 function parseTags(tags: any) {
@@ -102,26 +109,29 @@ async function getEC2Instances() {
 		terminated: [],
 		"shutting-down": []
 	};
-	const ec2Client = new EC2({ region: REGION });
-	const listOfInstances = await ec2Client.describeInstances().promise();
-	listOfInstances.Reservations?.forEach((reservations: any) => {
-		const instance = reservations.Instances[0];
-		const tags = parseTags(instance.Tags);
-		const server = new Server(tags);
-		server.instanceType = instance.InstanceType;
-		server.privateIP = instance.PrivateIpAddress;
-		server.publicIP = instance.PublicIpAddress || "---";
-		server.state = instance.State.Name || null;
-		server.instanceID = instance.InstanceId;
-		serverList[server.state].push(server);
-	});
+	await REGIONS.reduce(async (prev, region) => {
+		await prev;
+		const ec2Client = new EC2({ region: region });
+		const listOfInstances = await ec2Client.describeInstances().promise();
+		listOfInstances.Reservations?.forEach((reservations: any) => {
+			const instance = reservations.Instances[0];
+			const tags = parseTags(instance.Tags);
+			const server = new Server(tags);
+			server.instanceType = instance.InstanceType;
+			server.privateIP = instance.PrivateIpAddress;
+			server.publicIP = instance.PublicIpAddress || "---";
+			server.state = instance.State.Name || null;
+			server.instanceID = instance.InstanceId;
+			serverList[server.state].push(server);
+		});
 
-	serverList.pending = serverList.pending.sort(stringComparison);
-	serverList.running = serverList.running.sort(stringComparison);
-	serverList.stopped = serverList.stopped.sort(stringComparison);
-	serverList.stopping = serverList.stopping.sort(stringComparison);
-	serverList.terminated = serverList.terminated.sort(stringComparison);
-	serverList["shutting-down"] = serverList["shutting-down"].sort(stringComparison);
+		serverList.pending = serverList.pending.sort(stringComparison);
+		serverList.running = serverList.running.sort(stringComparison);
+		serverList.stopped = serverList.stopped.sort(stringComparison);
+		serverList.stopping = serverList.stopping.sort(stringComparison);
+		serverList.terminated = serverList.terminated.sort(stringComparison);
+		serverList["shutting-down"] = serverList["shutting-down"].sort(stringComparison);
+	}, Promise.resolve());
 	writeFileSync("servers.json", JSON.stringify(serverList));
 }
 
@@ -171,11 +181,13 @@ function displayTable() {
 async function init(refreshList: boolean, display: boolean) {
 	const migrationRetrunCode = checkAndMigrate();
 	if (migrationRetrunCode == "ERR_MISSING_CONFIG") await setConfig();
-
+	configureRegions();
 	setEnvVars();
 
 	if (!existsSync("servers.json") || refreshList)
 		await getEC2Instances();
+
+
 
 	generateServerListForTableDisplay();
 	if (display) displayTable();
