@@ -22,7 +22,6 @@ const inquirer_1 = require("inquirer");
 const types_1 = require("./types");
 const version = "2.0.0";
 let REGIONS = ["ap-south-1", "ap-south-2"];
-let KEY = "./av.pem";
 const servers = [];
 const serverNames = [];
 const serverConnection = [];
@@ -37,8 +36,10 @@ function stringComparison(a, b) {
     return 0;
 }
 function checkAndMigrate() {
-    if ((0, fs_1.existsSync)("credentials.json"))
+    var _a;
+    if ((0, fs_1.existsSync)("credentials.json")) {
         return;
+    }
     if (!(0, fs_1.existsSync)("credentials") || !(0, fs_1.existsSync)("config"))
         return "ERR_MISSING_CONFIG";
     const configData = (0, fs_1.readFileSync)("config").toString();
@@ -48,7 +49,7 @@ function checkAndMigrate() {
         "REGION": configData,
         "AWS_ACCESS_KEY_ID": creds[1].split(" = ")[1],
         "AWS_SECRET_ACCESS_KEY": creds[2].split(" = ")[1],
-        "KEY": "./av.pem"
+        "KEY": ((_a = creds[3]) === null || _a === void 0 ? void 0 : _a.split(" = ")[1]) || ""
     };
     (0, fs_1.writeFileSync)("credentials.json", JSON.stringify(credentials));
     (0, fs_1.rmSync)("credentials");
@@ -82,7 +83,7 @@ function setConfig() {
             {
                 type: "input",
                 name: "KEY",
-                message: "Path to key file",
+                message: "SSH KEY PATH (for SSH connections, can be left empty): ",
             },
         ];
         const credentials = yield (0, inquirer_1.prompt)(questions);
@@ -94,7 +95,7 @@ function setEnvVars() {
     const regions = JSON.parse((0, fs_1.readFileSync)("region.json").toString());
     process.env.AWS_ACCESS_KEY_ID = creds.AWS_ACCESS_KEY_ID;
     process.env.AWS_SECRET_ACCESS_KEY = creds.AWS_SECRET_ACCESS_KEY;
-    KEY = creds.KEY;
+    process.env.AWS_REGION = creds.REGION;
     REGIONS = regions;
 }
 function parseTags(tags) {
@@ -154,32 +155,32 @@ function generateServerListForTableDisplay() {
     serverList.running.forEach((s) => {
         servers.push([s.name, s.instanceType, s.publicIP, s.privateIP, s.user, s.autoOff]);
         serverNames.push(s.name);
-        serverConnection.push([s.user, s.publicIP]);
+        serverConnection.push(s.instanceID);
     });
     serverList.pending.forEach((s) => {
         servers.push([s.name.yellow, s.instanceType, s.publicIP, s.privateIP, s.user, s.autoOff]);
         serverNames.push(s.name);
-        serverConnection.push([s.user, s.publicIP]);
+        serverConnection.push(s.instanceID);
     });
     serverList.stopping.forEach((s) => {
         servers.push([s.name.gray, s.instanceType.gray, s.publicIP.gray, s.privateIP.gray, s.user.gray, s.autoOff]);
         serverNames.push(s.name);
-        serverConnection.push([s.user, s.publicIP]);
+        serverConnection.push(s.instanceID);
     });
     serverList.stopped.forEach((s) => {
         servers.push([s.name.gray, s.instanceType.gray, s.publicIP.gray, s.privateIP.gray, s.user.gray, s.autoOff]);
         serverNames.push(s.name);
-        serverConnection.push([s.user, s.publicIP]);
+        serverConnection.push(s.instanceID);
     });
     serverList["shutting-down"].forEach((s) => {
         servers.push([s.name.gray, s.instanceType.gray, s.publicIP.gray, s.privateIP.gray, s.user.gray, s.autoOff]);
         serverNames.push(s.name);
-        serverConnection.push([s.user, s.publicIP]);
+        serverConnection.push(s.instanceID);
     });
     serverList.terminated.forEach((s) => {
         servers.push([`💀 ${s.name.grey}`, s.instanceType.gray, s.publicIP.gray, s.privateIP.gray, s.user.gray, s.autoOff]);
         serverNames.push(s.name);
-        serverConnection.push([s.user, s.publicIP]);
+        serverConnection.push(s.instanceID);
     });
 }
 function displayTable() {
@@ -220,20 +221,69 @@ function makeSelection() {
             }]).then(_d => _d.selection - 1);
     });
 }
+function checkDependencies() {
+    try {
+        (0, child_process_1.spawnSync)("which", ["aws"], { stdio: "pipe" });
+    }
+    catch (e) {
+        console.log("Error: AWS CLI not found. Please install aws-cli.".red);
+        return false;
+    }
+    try {
+        (0, child_process_1.spawnSync)("which", ["session-manager-plugin"], { stdio: "pipe" });
+    }
+    catch (e) {
+        console.log("Error: session-manager-plugin not found. Please install aws-sessions-manager-plugin.".red);
+        return false;
+    }
+    return true;
+}
 function connect(selection) {
     return __awaiter(this, void 0, void 0, function* () {
         const table = new cli_table3_1.default();
-        if (serverConnection[selection][1] === "---") {
-            table.push(["Error".red]);
-            table.push([`Cannot connect to server ${serverNames[selection].red}`]);
+        const creds = JSON.parse((0, fs_1.readFileSync)("credentials.json").toString());
+        const serverList = JSON.parse((0, fs_1.readFileSync)("servers.json").toString());
+        const connectionMethod = yield (0, inquirer_1.prompt)([{
+                type: "list",
+                name: "method",
+                message: "Connect via:",
+                choices: ["SSM", "SSH"]
+            }]).then(d => d.method);
+        if (connectionMethod === "SSM") {
+            if (!checkDependencies()) {
+                process.exit(1);
+            }
+            const instanceID = serverConnection[selection];
+            table.push([`Connecting to ${serverNames[selection].yellow}`]);
+            table.push([`aws ssm start-session --target ${instanceID}`]);
             console.log(table.toString());
-            process.exit();
+            (0, child_process_1.spawnSync)("aws", ["ssm", "start-session", "--target", instanceID], { stdio: [0, 1, 2] });
         }
-        const connectionArgs = ["-i", KEY, serverConnection[selection].join("@")];
-        table.push([`Connection string for ${serverNames[selection].yellow}`]);
-        table.push([`ssh ${connectionArgs.join(" ")}`]);
-        console.log(table.toString());
-        (0, child_process_1.spawnSync)("ssh", connectionArgs, { stdio: [0, 1, 2] });
+        else {
+            if (!creds.KEY) {
+                console.log("Error: SSH key path not configured. Run with --reload to set it.".red);
+                process.exit(1);
+            }
+            const allServers = [
+                ...serverList.running,
+                ...serverList.pending,
+                ...serverList.stopping,
+                ...serverList.stopped,
+                ...serverList["shutting-down"],
+                ...serverList.terminated
+            ];
+            const selectedServer = allServers.find((s) => s.instanceID === serverConnection[selection]);
+            const user = (selectedServer === null || selectedServer === void 0 ? void 0 : selectedServer.user) || "ubuntu";
+            const publicIP = selectedServer === null || selectedServer === void 0 ? void 0 : selectedServer.publicIP;
+            if (publicIP === "---") {
+                console.log("Error: Selected server has no public IP. Use SSM instead.".red);
+                process.exit(1);
+            }
+            table.push([`Connecting to ${serverNames[selection].yellow}`]);
+            table.push([`ssh -i ${creds.KEY} ${user}@${publicIP}`]);
+            console.log(table.toString());
+            (0, child_process_1.spawnSync)("ssh", ["-i", creds.KEY, `${user}@${publicIP}`], { stdio: [0, 1, 2] });
+        }
     });
 }
 const program = new commander_1.Command();
